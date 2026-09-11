@@ -1,0 +1,19 @@
+# 依赖目录（本地安装的第三方包，不需要上传）
+node_modules/
+
+# Netlify 本地运行产生的缓存目录
+.netlify/
+
+# 临时文件与日志
+*.log
+*.tmp
+resp.tmp
+
+# 操作系统自动生成的文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器配置
+.vscode/
+.idea/

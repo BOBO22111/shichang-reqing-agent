@@ -1,0 +1,16 @@
+{
+  "name": "shichang-reqing-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "市场热度情绪智能体 —— 全市场热度排行、赛道冷热识别与资金轮动监测",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "start": "node dev-server.mjs",
+    "pack": "node 打包上传文件夹.mjs",
+    "check": "node 检查上传格式.mjs",
+    "check:github": "node 检查上传格式.mjs github"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

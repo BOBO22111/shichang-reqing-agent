@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>市场热度情绪智能体 · 全市场热度排行与资金轮动监测</title>
+<meta name="description" content="对全市场合约进行横截面扫描，计算币种热度排行、识别热门与冷门赛道、追踪资金在大饼与小币之间的轮动方向，并输出五档市场情绪。仅供市场风险观测，不构成投资建议。" />
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+
+<!-- ===================== 顶部总览条（粘性） ===================== -->
+<header class="topbar">
+  <div class="topbar-inner">
+
+    <div class="tb-brand">
+      <div class="contest-row">
+        <!-- 自绘菱形图标：呼应参赛平台的视觉语言，非官方商标 -->
+        <svg class="binance-mark" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="7.5" y="7.5" width="9" height="9" transform="rotate(45 12 12)" fill="#F0B90B"/>
+          <rect x="10.4" y="10.4" width="3.2" height="3.2" transform="rotate(45 12 12)" fill="#fff"/>
+        </svg>
+        <span class="contest-tag">币安 Agent 参赛作品 · 方向：数据分析</span>
+        <span class="unofficial-tag">非官方 · 仅参赛</span>
+      </div>
+      <h1 class="brand-title">市场热度情绪智能体</h1>
+      <p class="brand-sub">全市场热度排行 · 赛道冷热 · 资金轮动监测</p>
+    </div>
+
+    <div class="tb-mood">
+      <div class="mood-badge" id="moodBadge" data-mood="3">
+        <span class="mood-badge-label" id="moodBadgeLabel">等待数据</span>
+      </div>
+      <div class="mood-figure">
+        <div class="mood-score-row">
+          <span class="mood-score-label">市场情绪指数</span>
+          <span class="mood-score-value" id="moodScore">—</span>
+          <span class="mood-score-unit">/ 100</span>
+        </div>
+        <div class="mood-track"><div class="mood-track-fill" id="moodTrackFill" style="width:0%"></div></div>
+        <p class="mood-desc" id="moodDesc">正在读取全市场行情快照…</p>
+      </div>
+    </div>
+
+    <div class="tb-actions">
+      <span class="source-chip" id="sourceChip" title="当前取数通道">取数通道：检测中</span>
+      <span class="refresh-time" id="refreshTime">尚未加载</span>
+      <button type="button" class="btn btn-primary" id="refreshBtn">立即刷新</button>
+      <label class="switch" title="开启后每 60 秒自动重新抓取一次快照">
+        <input type="checkbox" id="autoRefreshChk" checked />
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-text">自动刷新</span>
+      </label>
+    </div>
+
+  </div>
+</header>
+
+<main class="page">
+
+  <!-- ===================== 错误提示 ===================== -->
+  <section class="alert" id="alertBox" hidden>
+    <div class="alert-head">
+      <span class="alert-icon">!</span>
+      <strong id="alertTitle">数据获取失败</strong>
+    </div>
+    <p class="alert-msg" id="alertMsg"></p>
+    <p class="alert-hint">页面不会用演示数据顶替实时行情。请稍后点击「立即刷新」重试。</p>
+  </section>
+
+  <!-- ===================== 总览指标带 ===================== -->
+  <section class="statstrip" id="statStrip">
+    <div class="stat-card">
+      <span class="stat-label">全市场成交额（24h）</span>
+      <span class="stat-value" id="statTotalVol">—</span>
+      <span class="stat-note" id="statTotalVolNote">统计中</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">全市场持仓量</span>
+      <span class="stat-value" id="statTotalOi">—</span>
+      <span class="stat-note">按标记价折算美元</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">上涨家数占比</span>
+      <span class="stat-value" id="statBreadth">—</span>
+      <span class="stat-note" id="statBreadthNote">上涨 / 总家数</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">成交额加权涨跌</span>
+      <span class="stat-value" id="statWqChg">—</span>
+      <span class="stat-note">按成交额加权，反映主流资金方向</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">涨跌中位数</span>
+      <span class="stat-value" id="statMedianChg">—</span>
+      <span class="stat-note">剔除极端值后的市场中枢</span>
+    </div>
+    <div class="stat-card">
+      <span class="stat-label">大饼成交额占比</span>
+      <span class="stat-value" id="statBtcShare">—</span>
+      <span class="stat-note">占比升高＝资金避险集中</span>
+    </div>
+  </section>
+
+  <!-- ===================== 主体两栏 ===================== -->
+  <div class="split">
+
+    <!-- ---------- 左栏 ---------- -->
+    <div class="col-main">
+
+      <!-- 气泡图 -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">全市场热度分布</h2>
+            <p class="panel-sub">横轴＝24 小时涨跌幅　纵轴＝换手强度　气泡大小＝24 小时成交额　颜色＝涨跌方向</p>
+          </div>
+          <div class="panel-tools">
+            <button type="button" class="chip-btn is-on" data-bubble-filter="all">全部</button>
+            <button type="button" class="chip-btn" data-bubble-filter="top">热度前 40</button>
+            <button type="button" class="chip-btn" data-bubble-filter="outflow">出逃嫌疑</button>
+          </div>
+        </div>
+        <div class="canvas-wrap bubble-wrap">
+          <canvas id="bubbleCanvas" aria-label="全市场热度气泡图"></canvas>
+          <div class="bubble-tip" id="bubbleTip" hidden></div>
+          <div class="canvas-empty" id="bubbleEmpty">等待行情数据…</div>
+        </div>
+        <p class="canvas-foot" id="bubbleFoot">气泡位置越靠右上，说明涨幅越大、换手越活跃。</p>
+      </section>
+
+      <!-- 热度排行榜 -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">币种热度排行榜</h2>
+            <p class="panel-sub" id="rankSub">按热度分数排序 · 点击任意一行查看该币种详情</p>
+          </div>
+          <div class="panel-tools">
+            <div class="seg" id="rankTabs">
+              <button type="button" class="seg-btn is-on" data-rank="hot">最热 20</button>
+              <button type="button" class="seg-btn" data-rank="cold">最冷 20</button>
+              <button type="button" class="seg-btn" data-rank="turnover">换手最高</button>
+              <button type="button" class="seg-btn" data-rank="all">全部</button>
+            </div>
+            <input type="search" class="search-input" id="rankSearch" placeholder="搜索币种，例如 BTC" />
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="rank-table">
+            <thead>
+              <tr>
+                <th class="ta-c">#</th>
+                <th>币种</th>
+                <th>赛道</th>
+                <th class="ta-r">24h 涨跌</th>
+                <th class="ta-r">24h 成交额</th>
+                <th class="ta-r">换手强度</th>
+                <th class="ta-r">热度分数</th>
+              </tr>
+            </thead>
+            <tbody id="rankBody">
+              <tr class="row-empty"><td colspan="7">正在读取全市场行情快照…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="panel-foot" id="rankFoot">换手强度 = 24 小时成交额 ÷ 持仓量，用于替代无法计算的换手率。</p>
+      </section>
+
+    </div>
+
+    <!-- ---------- 右栏 ---------- -->
+    <div class="col-side">
+
+      <!-- 资金轮动 -->
+      <section class="panel panel-rotation">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">资金轮动监测</h2>
+            <p class="panel-sub">追踪资金在大饼与小币之间的流动方向</p>
+          </div>
+        </div>
+        <div class="rotation-verdict" id="rotationVerdict" data-dir="flat">
+          <span class="rotation-verdict-text" id="rotationVerdictText">等待数据</span>
+        </div>
+        <div class="flow-band">
+          <div class="flow-end flow-end-left">
+            <span class="flow-end-name">大饼</span>
+            <span class="flow-end-val" id="flowBtcPerf">—</span>
+          </div>
+          <div class="flow-rail">
+            <div class="flow-center"></div>
+            <div class="flow-pointer" id="flowPointer" style="left:50%"></div>
+          </div>
+          <div class="flow-end flow-end-right">
+            <span class="flow-end-name">小币组</span>
+            <span class="flow-end-val" id="flowAltPerf">—</span>
+          </div>
+        </div>
+        <div class="rotation-rows">
+          <div class="kv-row"><span class="kv-key">超额表现（大饼 − 小币组）</span><span class="kv-val" id="rotRs">—</span></div>
+          <div class="kv-row"><span class="kv-key">大饼成交额占比</span><span class="kv-val" id="rotBtcShare">—</span></div>
+          <div class="kv-row"><span class="kv-key">占比变化（本次会话）</span><span class="kv-val" id="rotShareDelta">—</span></div>
+          <div class="kv-row"><span class="kv-key">小币组范围</span><span class="kv-val" id="rotAltScope">—</span></div>
+        </div>
+        <p class="panel-foot" id="rotationFoot">大饼成交额占比变化需要至少两次刷新才能得出。</p>
+      </section>
+
+      <!-- 资金出逃 -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">资金出逃警示</h2>
+            <p class="panel-sub">跌幅明显 ＋ 成交活跃 ＋ 换手偏高的币种</p>
+          </div>
+          <span class="count-pill" id="outflowCount">0</span>
+        </div>
+        <ul class="outflow-list" id="outflowList">
+          <li class="outflow-empty">正在统计…</li>
+        </ul>
+        <p class="panel-foot" id="outflowFoot">判定条件：跌幅 ≤ −4.5%、成交额排名前 40%、换手强度排名前 40%。</p>
+      </section>
+
+      <!-- 赛道冷热 -->
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">赛道冷热排行</h2>
+            <p class="panel-sub">按赛道内成交额加权的平均热度排序</p>
+          </div>
+        </div>
+        <div class="sector-ranks">
+          <div class="sector-rank-block">
+            <h3 class="sector-rank-title is-hot">热门赛道</h3>
+            <ol class="sector-rank-list" id="sectorHotList"><li class="sector-rank-empty">统计中…</li></ol>
+          </div>
+          <div class="sector-rank-block">
+            <h3 class="sector-rank-title is-cold">冷门赛道</h3>
+            <ol class="sector-rank-list" id="sectorColdList"><li class="sector-rank-empty">统计中…</li></ol>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- ===================== 赛道热度矩阵（全宽） ===================== -->
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">赛道热度矩阵</h2>
+        <p class="panel-sub">每个方块代表一个币种，颜色越偏红表示热度越高、越偏蓝表示热度越低；方块下方为所属赛道</p>
+      </div>
+      <div class="panel-tools">
+        <span class="legend-scale">
+          <span class="legend-label">低</span>
+          <span class="legend-bar"></span>
+          <span class="legend-label">高</span>
+        </span>
+      </div>
+    </div>
+    <div class="sector-matrix" id="sectorMatrix">
+      <p class="matrix-empty">正在统计赛道分布…</p>
+    </div>
+    <p class="panel-foot" id="sectorMatrixFoot">赛道分类由内置映射表提供，未收录的币种归入「其他」。</p>
+  </section>
+
+  <!-- ===================== 数据来源与计算口径 ===================== -->
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2 class="panel-title">数据来源与计算口径</h2>
+        <p class="panel-sub">以下说明用于解释页面上每个数字是怎么来的</p>
+      </div>
+    </div>
+    <div class="notes-grid">
+      <div class="note-item">
+        <h3>数据来源</h3>
+        <p>全部行情来自<strong>各大平台公开行情接口</strong>（USDT 永续合约口径），无需密钥，不登录、不绑定任何账户。</p>
+      </div>
+      <div class="note-item">
+        <h3>热点分数</h3>
+        <p>由 24 小时涨跌幅、成交额、换手强度、波动幅度四项各自在全市场中的<strong>百分位排名</strong>加权得出，权重分别为 30%、30%、20%、20%。成交额先取对数再排名，避免大币与小币量级差距过大。</p>
+      </div>
+      <div class="note-item">
+        <h3>换手强度</h3>
+        <p>公开行情接口不提供流通量与流通市值，因此<strong>无法计算标准口径的换手率</strong>。本项目改用 <strong>换手强度 = 24 小时成交额 ÷ 持仓量美元值</strong> 作为替代，衡量资金周转的快慢。</p>
+      </div>
+      <div class="note-item">
+        <h3>波动幅度</h3>
+        <p>＝（24 小时最高价 − 最低价）÷ 最低价。该字段仅综合平台口径提供；切换到不提供该字段的数据源时，页面该列显示「—」并说明原因，<strong>不做估算、不填假数</strong>。</p>
+      </div>
+      <div class="note-item">
+        <h3>情绪五档</h3>
+        <p>由上涨家数占比（40%）、成交额加权涨跌幅（30%）、高热度币种占比（30%）合成情绪指数，并对资金过度集中于大饼的情形做避险扣分，再映射为狂热 / 活跃 / 中性 / 低迷 / 恐慌五档。</p>
+      </div>
+      <div class="note-item">
+        <h3>与恐慌贪婪指数的区别</h3>
+        <p>常见的恐慌贪婪指数是<strong>单一资产视角</strong>，主要看大饼自身的波动率、动量与社媒情绪。本项目是<strong>全市场横截面视角</strong>：统计 200 多个币种的广度结构，再叠加资金在大饼与小币之间的流向。本项目<strong>不采集任何社媒、问卷或舆情数据</strong>。</p>
+      </div>
+      <div class="note-item">
+        <h3>赛道分类</h3>
+        <p>赛道来自项目内置的「币种 → 赛道」映射表，按成交额收录主流币种；未收录的币种归入「其他」，并在页面上如实显示其覆盖情况。</p>
+      </div>
+      <div class="note-item">
+        <h3>会话内变化</h3>
+        <p>持仓量、成交额占比的变化需要至少两个时间点的数据。页面把你本次打开期间的快照记在<strong>浏览器本地</strong>，用于计算变化；首次打开时该列显示「—」并提示等待下一次刷新。</p>
+      </div>
+      <div class="note-item">
+        <h3>取数通道</h3>
+        <p>优先使用站点自带的云端接口代理（带服务端短时缓存与统一错误处理）；检测到云端不可用时，自动切换为浏览器直连，页面顶部会如实显示当前使用的通道。</p>
+      </div>
+      <div class="note-item">
+        <h3>数据真实性</h3>
+        <p>页面只展示接口真实返回的数据。接口失败或超时时显示明确的中文失败原因，<strong>不会用演示数据或固定数值顶替，也不会把演示数据描述成实时数据</strong>。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 风险提示 ===================== -->
+  <section class="disclaimer">
+    <h2 class="disclaimer-title">风险提示</h2>
+    <p>本页面仅用于数字资产市场风险观测与数据分析，<strong>不构成投资建议</strong>，不代表任何买卖承诺。页面中的热度分数、情绪档位、赛道冷热与资金轮动结论，均为基于公开行情数据的程序化统计结果，<strong>不等于实际交易建议</strong>。</p>
+    <p>技术统计是对历史与当期价格的描述，天然存在滞后；行情数据可能存在延迟、缺失或接口波动。本页面不接入交易权限、不保存私钥、不执行任何下单操作，不登录也不读取任何账户信息。</p>
+    <p>市场有风险，投资需谨慎。任何投资决策应结合个人风险承受能力、资金状况与投资目标独立判断，必要时咨询持牌专业机构。过往表现不预示未来收益。</p>
+    <p>本页面为<strong>币安 Agent 大赛参赛作品，非官方产品</strong>，与币安官方无任何隶属或合作关系；页面中的品牌名称仅用于说明参赛背景，相关商标权利归其权利人所有。</p>
+  </section>
+
+  <footer class="foot">
+    <span>市场热度情绪智能体 · 全市场横截面热度与资金轮动分析</span>
+    <span class="foot-dot">·</span>
+    <span>数据每 60 秒可刷新一次</span>
+  </footer>
+
+</main>
+
+<!-- ===================== 币种详情抽屉 ===================== -->
+<aside class="drawer" id="drawer" hidden aria-label="币种详情">
+  <div class="drawer-head">
+    <div>
+      <h2 class="drawer-title" id="drawerTitle">币种详情</h2>
+      <p class="drawer-sub" id="drawerSub"></p>
+    </div>
+    <button type="button" class="drawer-close" id="drawerClose" aria-label="关闭">×</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+<div class="drawer-mask" id="drawerMask" hidden></div>
+
+<!-- ===================== 脚本（顺序不可调换） ===================== -->
+<script src="/sectors.js"></script>
+<script src="/market-snapshot.js"></script>
+<script src="/heat-engine.js"></script>
+<script src="/history-tracker.js"></script>
+<script src="/data-source.js"></script>
+<script src="/api-client.js"></script>
+<script src="/chart.js"></script>
+<script src="/app.js"></script>
+
+</body>
+</html>

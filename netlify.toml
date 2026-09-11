@@ -1,0 +1,41 @@
+# =========================================================================
+# netlify.toml —— 部署配置
+# 说明：本项目是「静态页面 + 云端函数」的结构。
+#   publish   = "."          静态文件就在仓库根目录，所以发布目录是当前目录
+#   functions = "functions"  云端函数放在 functions 文件夹里
+# 所有网页文件都平铺在根目录、只有一个 functions 文件夹，
+# 这样在 GitHub 网页版上传时可以一次全选拖进去，不会漏文件。
+# =========================================================================
+
+[build]
+  publish = "."
+  functions = "functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# ---- 页面调用的两个接口，转发到云端函数 ----
+# 注意顺序：接口规则必须写在通配兜底规则之前，否则会被兜底规则抢先匹配
+
+[[redirects]]
+  from = "/api/heat"
+  to = "/.netlify/functions/heat"
+  status = 200
+
+[[redirects]]
+  from = "/api/market"
+  to = "/.netlify/functions/market"
+  status = 200
+
+# ---- 兜底：其余路径都交给首页 ----
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# ---- 基础安全响应头 ----
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
