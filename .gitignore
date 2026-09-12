@@ -17,3 +17,6 @@ desktop.ini
 # 编辑器配置
 .vscode/
 .idea/
+
+# 命令行入口的本地对比基线（只保存在本机，不要上传）
+.src-agent-state.json
