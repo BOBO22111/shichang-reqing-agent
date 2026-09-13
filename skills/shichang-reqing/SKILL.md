@@ -33,7 +33,7 @@ license: MIT
 
 | 通道 | 官方来源 | 特点 |
 |---|---|---|
-| `--skill`（官方技能） | 官方技能市场 [binance/binance-skills-hub](https://github.com/binance/binance-skills-hub) 的 `binance` 技能：调用其驱动的命令行工具 `binance-cli` 取全市场行情（Market 区块，无需鉴权） | 全市场现货快照；未安装 `binance-cli` 时自动回退到 `--live` 同一端点，并打印官方安装命令 |
+| `--skill`（官方技能） | 官方技能市场 [binance/binance-skills-hub](https://github.com/binance/binance-skills-hub) 的 `binance` 技能：调用其驱动的命令行工具 `binance-cli` 取全市场行情（Market 区块，无需鉴权） | 全市场现货快照；官方 CLI 默认入口不可达时改用官方为「仅公开行情」提供的独立入口（请求仍由官方 CLI 发起）；未安装 `binance-cli` 时自动回退到 `--live` 同一端点，并打印官方安装命令 |
 | `--official`（推荐） | [binance/binance-public-data](https://github.com/binance/binance-public-data) → `data.binance.vision` 的合约 K 线 + 合约指标文件 | **合约口径 + 附带持仓量**；结果可复现；币种名单从实时接口动态获取 |
 | `--live` | [binance/binance-spot-api-docs](https://github.com/binance/binance-spot-api-docs) 记载的公开行情入口 `data-api.binance.vision` | 一次请求拿全市场现货快照（`ticker/24hr` 不带 symbol） |
 | 默认（实时多平台） | 多平台公开行情接口（合约 + 链上） | 与网页版完全一致的口径，打开即用 |
@@ -106,7 +106,7 @@ node agent.mjs --reset
 |---|---|
 | `--official` | 官方公开数据通道（历史文件，**推荐**，可复现且带持仓量） |
 | `--live` | 官方公开行情接口（全市场现货快照，一次请求拿全） |
-| `--skill` | 官方技能通道：优先调用 `binance-cli`；未安装时回退到 `--live` 同一端点 |
+| `--skill` | 官方技能通道：优先调用 `binance-cli`；主站入口不可达时自动改用官方公开行情专用入口；未安装时回退到 `--live` 同一端点 |
 | `--top N` | 官方通道参与分析的合约数量上限，默认 120，最大 400 |
 | `--symbols A,B,C` | 官方通道只分析这些币种（优先于动态取名单） |
 | `--date YYYY-MM-DD` | 官方通道的 UTC 日期，默认自动取最近一个已发布文件的日期 |
@@ -124,6 +124,15 @@ node agent.mjs --reset
 | 想要带持仓量的合约口径 | **官方公开数据** | `node agent.mjs --official` |
 | 想覆盖更多币种 | 官方公开行情接口 | `node agent.mjs --live`（一次拿全市场现货） |
 | 已按官方技能装好 binance-cli，想走官方工具 | **官方技能** | `node agent.mjs --skill` |
+
+### 关于官方技能通道（`--skill`）
+
+- **怎么装**：该通道调用的是官方技能市场 `binance` 技能所驱动的命令行工具，安装命令见官方仓库 `binance/binance-cli`。
+  该仓库的 **Windows 构建只发布在 `v2.0.0`**（之后的版本只有 macOS 与 Linux 包）。装好后命令名为 `binance-cli`；
+  也可以用环境变量 `BINANCE_CLI_PATH` 直接指定可执行文件的完整路径。
+- **网络**：官方 CLI 的行情命令默认访问官方主站域名。若该域名在当前网络下不可达，本技能会自动改用官方为
+  「仅需公开行情」提供的独立入口 —— **请求仍由官方 CLI 发起、返回的仍是官方数据**，输出里会如实标注走的是哪一条。
+- **没装也能用**：本技能会回退到 `--live`（同一份官方公开行情数据），并打印官方安装命令，不影响出结论。
 
 ### 关于官方通道的「币种名单是怎么来的」
 
