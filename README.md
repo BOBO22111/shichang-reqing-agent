@@ -52,7 +52,7 @@ npx skills add https://github.com/BOBO22111/shichang-reqing-agent
 | 官方资源 | 为什么没用 |
 |---|---|
 | Skills Hub 中 `binance` 组的其余 6 个技能（`academy-skill` · `fiat` · `onchain-pay` · `p2p` · `payment` · `square-post`） | 都是账户、支付、交易类能力，本作品只做**公开行情数据分析**，不需要账户权限，也不需要下单能力 |
-| Skills Hub 的 Web3 组 13 个技能（如 `crypto-market-rank` 全市场热度榜、`binance-trading-signal` 信号流） | 功能上最接近本作品，但它们的接口域名在当前网络下**连接超时**，装了也跑不起来 |
+| Skills Hub 的 Web3 组 13 个技能（如 `crypto-market-rank` 全市场热度榜、`binance-trading-signal` 信号流） | 该组技能的主力接口域名 `web3.binance.com` 在当前网络下**不可达**（已实测定性：本机 DNS 把它解析到错误 IP，改用公共 DNS 取到的真实 IP 直连时，TLS 握手被重置）→ 装了也取不到数。**其中 1 个例外已实测跑通**：`query-token-info` 的 `kline` 命令走另一个域名，真取到了 K 线数据 —— 但它给的是**链上单币**口径，与本作品的**中心化合约全市场**口径不同，混用会污染统计，故未接入 |
 | `binance-connector-js` / `binance-connector-python` / `binance-futures-connector-python` | 官方连接器把接口域名写死在代码里（`api.binance.com` / `fapi.binance.com`），当前网络不可达且无法改指公开入口 |
 | `binance-api-postman` | 手工调接口用的 Postman 集合，本项目用代码直接请求，用不上 |
 
@@ -218,7 +218,7 @@ node dev-server.mjs
 依次全选拖进去即可：不用挑文件，也不会和仓库里已有的同名文件冲突。
 打包脚本还会自动和仓库联网逐字节比对，生成《本次要传什么.md》——
 它会列出这一次真正有变动的文件（多数情况下 20 多个文件里只有几个需要上传），
-避免每次全量重传。具体步骤见《上传到GitHub-操作步骤.md》。
+避免每次全量重传。具体步骤见《上传到GitHub-操作步骤.md》（作者本地自用的部署笔记，不随仓库发布）。
 
 ---
 
@@ -233,7 +233,7 @@ node dev-server.mjs
 
 两种方式下页面顶部的「取数通道」会如实显示当前实际使用的那条通道。
 
-详见《上传到Netlify-操作步骤.md》。
+详见《上传到Netlify-操作步骤.md》（作者本地自用的部署笔记，不随仓库发布）。
 
 ---
 
@@ -267,10 +267,19 @@ node 检查上传格式.mjs github
 
 ## 八、文档索引
 
+**随本仓库发布 —— 下面这几份在仓库里都能直接看到：**
+
 | 文档 | 内容 |
 |---|---|
+| `README.md` | 本文件：项目总览、官方资源逐项核对、运行与部署 |
 | `AGENT.md` | Agent 说明：用了哪些币安官方资源、怎么安装运行、结论怎么解释 |
 | `项目说明.md` | 完整项目说明（背景、算法、口径、架构、亮点） |
+| `skills/shichang-reqing/SKILL.md` | 按币安官方技能规范编写的 Agent 技能定义，可被技能安装器装载 |
+
+**作者本地的部署笔记与答辩稿（不随仓库发布，所以在仓库里检索不到，属正常）：**
+
+| 文档 | 内容 |
+|---|---|
 | `上传到Netlify-操作步骤.md` | 怎么把页面部署到网上拿到网址 |
 | `上传到GitHub-操作步骤.md` | 怎么把代码传到 GitHub 网页版 |
 | `参赛回复-评委两问.md` | 评委提问的标准回复文本 |
