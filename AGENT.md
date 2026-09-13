@@ -26,7 +26,10 @@ npx skills add https://github.com/BOBO22111/shichang-reqing-agent
 **第二层 —— 让本作品真的去调用官方技能**
 
 `node agent.mjs --skill` 这一条通道，直接调用官方 `binance` 技能所驱动的命令行工具
-`binance-cli`（该技能 `references/` 里的 Market 区块是**免鉴权**的行情能力）：
+`binance-cli`（该技能 `references/` 里的 Market 区块是**免鉴权**的行情能力）。
+官方 CLI 的行情命令默认访问官方主站域名；该域名在当前网络下不可达时，
+本作品会让**同一个官方 CLI** 改走官方为「仅需公开行情」提供的独立入口 ——
+**请求仍由官方 CLI 发起、返回的仍是官方数据**：
 
 ```bash
 node agent.mjs --skill          # 走官方技能 binance-cli
@@ -67,9 +70,10 @@ node agent.mjs                  # 多平台实时口径（与网页版完全一�
 | **[binance-skills-hub](https://github.com/binance/binance-skills-hub)**<br>官方技能市场 | **① 本作品的技能定义** `skills/shichang-reqing/SKILL.md` 完全遵循其公布的技能格式，可用官方安装器装载（`npx skills add`）；<br>**② `--skill` 通道直接调用官方 `binance` 技能**驱动的 `binance-cli` 取全市场行情；未安装 `binance-cli` 时**如实打印官方安装命令并回退**到同一 REST 端点，绝不假装调用过 | ✅ **已集成：技能格式对齐 + `--skill` 通道真实调用 binance-cli** |
 | **[binance-public-data](https://github.com/binance/binance-public-data)**<br>历史公开数据（`data.binance.vision`） | **`--official` 通道（主力通道）**：读官方每日**合约 K 线**（`futures/um/daily/klines`，含 `quote_volume`）与**合约指标文件**（`futures/um/daily/metrics`，含 `sum_open_interest_value` 持仓量美元值），逐币拼出带持仓量的全市场快照 | ✅ **已集成并实测**（实测 2026-09-11：120 个币并发下载、**7.7 秒**、114 个解析成功、112 个进入统计） |
 | **[binance-spot-api-docs](https://github.com/binance/binance-spot-api-docs)**<br>现货 API 与行情流官方文档 | 按该文档实现的**公开行情入口** `data-api.binance.vision`：`--live` 通道的 `ticker/24hr`（不带 symbol，一次拿全市场）取自这里 —— 这是官方为「仅需公开行情」场景提供的公开地址，不需要 API 密钥，也不返回账户信息 | ✅ **已集成并实测**（实测 467 个现货交易对，单次请求 0.9 秒出结论） |
-| **[binance-cli](https://github.com/binance/binance-cli)**（官方技能 `binance` 驱动） | **`--skill` 通道的目标工具**：装好之后本作品直接调用它取全市场行情；本机未安装该工具时自动回退到等价的 `--live` 通道并打印官方安装命令 | ✅ 已集成（`--skill` 通道；本机无 CLI 时如实回退） |
+| **[binance-cli](https://github.com/binance/binance-cli)**（官方技能 `binance` 驱动） | **`--skill` 通道的目标工具**：装好之后本作品直接调用它取全市场行情。官方 CLI 的行情命令默认访问官方主站域名；该域名在当前网络下不可达时，本作品会让**同一个官方 CLI** 改用官方为「仅需公开行情」提供的独立入口，请求仍由官方 CLI 发起。未安装该工具时如实打印官方安装命令并回退到等价的 `--live` 通道 | ✅ **已集成并实测**（本机 Windows 实测：官方 CLI 取回 469 个现货交易对，`--skill` 通道正常出结论） |
+| **binance-skills-hub 的 `binance` 组其余 6 个技能**（`academy-skill` · `fiat` · `onchain-pay` · `p2p` · `payment` · `square-post`） | 全部是账户、支付、交易类能力（P2P 交易、法币出入金、支付、广场发帖、学院内容等），需要账户权限。本作品只做**公开行情数据分析**，不登录、不绑定、不下单，用不上这些技能 | ⭕ 与作品定位无关，未引入 |
 | **binance-skills-hub 的 Web3 组（13 个技能，如 `crypto-market-rank` 全市场热度榜、`binance-trading-signal` 信号流）** | 功能上与本作品最接近的是 `crypto-market-rank`（全市场社交热度 / 涨幅榜 / 聪明钱净流入）。**但这些技能的接口全部挂在 `web3.binance.com`，本机网络对该域名不可达**（连接超时），装了也跑不起来，因此未作为依赖引入 | ⛔ 官方技能存在，但接口域名本机不可达 |
-| [binance-connector-js](https://github.com/binance/binance-connector-js)<br>官方 JS/TS 连接器 | 用于调用 `api.binance.com`。**本机网络对该域名不可达**（连接被拦），装了也无法运行，因此未作为依赖引入；改走上面那个官方公开行情入口 | ⛔ 网络不可达，未引入 |
+| [binance-connector-js](https://github.com/binance/binance-connector-js)<br>官方 JS/TS 连接器 | 用于调用 `api.binance.com`。**本机网络对该域名不可达**（连接被拦），且它把域名写在代码里、无法改指公开入口，因此未作为依赖引入；改走上面那个官方公开行情入口（官方 CLI 的 `request` 子命令支持直接把请求地址作为参数传入，所以 `--skill` 通道不受此限制） | ⛔ 网络不可达，未引入 |
 | [binance-connector-python](https://github.com/binance/binance-connector-python) | 官方 Python 连接器，同上（另一个域名的同一类接口），且本项目是 JS 技术栈 | ⛔ 与本项目技术栈不符 |
 | [binance-futures-connector-python](https://github.com/binance/binance-futures-connector-python) | 永续的 Python 连接器，指向 `fapi.binance.com`（本机同样不可达） | ⛔ 同上 |
 | [binance-api-postman](https://github.com/binance/binance-api-postman) | Postman 集合，用于手工调试接口；本项目用代码直接请求，未使用 | ⭕ 未使用（调试工具） |
@@ -97,6 +101,7 @@ node agent.mjs                  # 多平台实时口径（与网页版完全一�
         │
         ├─ 通道一（官方技能）  node agent.mjs --skill
         │    调用官方 binance 技能驱动的 binance-cli
+        │    主站域名不可达 → 同一个官方 CLI 改走官方公开行情专用入口
         │    未安装 → 如实打印官方安装命令 → 回退到通道二（同一端点）
         │
         ├─ 通道二（官方公开数据，推荐）  --official
@@ -151,7 +156,7 @@ node agent.mjs --official --symbols BTC,ETH,SOL
 # 官方公开行情接口（全市场现货快照，一次拿全）
 node agent.mjs --live
 
-# 官方技能通道（未装 binance-cli 会自动回退并给安装命令）
+# 官方技能通道（调用官方 binance 技能驱动的 binance-cli；未装会自动回退并给安装命令）
 node agent.mjs --skill
 
 # 自然语言 / JSON 输出
@@ -227,7 +232,7 @@ node agent.mjs --official --json
 | `_test-core.mjs` | 热度算法、两项排名处理、情绪五档、赛道聚合、资金出逃与轮动、两条取数通道口径一致性 | 见该脚本输出 |
 | `_test-server.mjs` | 接口与静态资源、访问控制、合规底线 | 见该脚本输出 |
 | `_test-page.mjs` | 页面端到端：真实加载、搜索交互、面板渲染 | 见该脚本输出 |
-| `_test-agent.mjs` | **命令行入口四条通道**（新增）：JSON 模式 stdout 可解析、stderr 不污染、退出码、回退行为 | 见该脚本输出 |
+| `_test-agent.mjs` | **命令行入口四条通道**（新增）：JSON 模式 stdout 可解析、stderr 不污染、退出码；`--skill` 按本机环境分别断言「真实调用」或「如实回退」 | **76 项全过** |
 | `打包上传文件夹.mjs` + `检查上传格式.mjs` | 打包完整性与上传前格式体检（双模式） | 见脚本输出 |
 
 **命令行入口实测记录**（2026-09-13，本机）：
@@ -236,9 +241,12 @@ node agent.mjs --official --json
 |---|---|---|
 | `--official`（120 个币） | 7.7 秒 | 114 个解析成功、112 个进入统计、情绪「中性」指数 58.6 |
 | `--live` | 0.9 秒 | 467 个现货交易对、情绪「中性」指数 51.0 |
-| `--skill` | 1.0 秒 | 未装 binance-cli → 如实打印官方安装命令并回退到 `--live` |
+| `--skill` | 2.6 秒 | **已装官方 CLI 并实测走通**：官方 CLI 取回 469 个现货交易对、情绪「中性」指数 48.5；未装该工具的机器上会如实打印官方安装命令并回退到 `--live` |
 | 默认（多平台实时） | 1.0 秒 | 261 个合约、情绪「中性」指数 53.2 |
 
 自测中抓到并修复的真实缺陷（不是看代码看出来的）：
 官方仓库对低价币使用「面值币」代码（PEPE 的文件其实叫 `1000PEPEUSDT`）导致小币整批解析失败、
-官方公开行情入口只有现货却把口径标成了永续、币种名单来源接口未导出导致名单静默降级到内置清单。
+官方公开行情入口只有现货却把口径标成了永续、币种名单来源接口未导出导致名单静默降级到内置清单；
+另外在**首次真正装好官方 CLI、把 `--skill` 跑通**时，暴露出「调用成功这条路径从未被执行过」
+而潜伏的下游空引用缺陷（`sourceInfo` 未赋值导致崩溃）—— 已修复，并把自测脚本改成
+「装了官方 CLI 就断言真实调用、没装就断言如实回退」的双环境断言。

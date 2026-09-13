@@ -22,13 +22,50 @@ npx skills add https://github.com/BOBO22111/shichang-reqing-agent
 
 | 通道 | 命令 | 数据来源 |
 |---|---|---|
-| 官方技能 | `node agent.mjs --skill` | 币安官方技能市场的 `binance` 技能 → `binance-cli`（未安装则如实回退并打印官方安装命令） |
+| 官方技能 | `node agent.mjs --skill` | 币安官方技能市场的 `binance` 技能 → `binance-cli`；官方 CLI 默认入口不可达时，**同一个官方 CLI** 改走官方公开行情专用入口（未安装则如实回退并打印官方安装命令） |
 | **官方公开数据** | `node agent.mjs --official` | 币安官方开源公开数据仓库的合约 K 线 + 合约指标（**带持仓量**，可复现） |
 | 官方公开行情 | `node agent.mjs --live` | 币安官方公开行情接口（全市场现货快照，一次拿全） |
 | 多平台实时 | `node agent.mjs` | 各大平台公开行情接口（USDT 永续合约口径，与网页版完全一致） |
 
+---
+
+## ⭐ 逐项核对：本作品到底用到了币安官方的哪几项
+
+把官方技能市场（Skills Hub）的 20 个技能与官方开源仓库逐个点了一遍，**真正在用**的是下面 3 项 ——
+每一项都有可当场跑出来的证据，不是挂名：
+
+| 官方技能 / 资源 | 是什么 | 本作品怎么用 | 可核验的证据 |
+|---|---|---|---|
+| **`binance` 技能**<br>（[Skills Hub](https://github.com/binance/binance-skills-hub) 提供，驱动命令行工具 `binance-cli`） | 官方技能；行情部分免鉴权 | `node agent.mjs --skill` **直接调用官方技能驱动的工具**取全市场行情。官方 CLI 默认入口不可达时，让**同一个官方 CLI** 改走官方公开行情专用入口（请求仍由官方 CLI 发起、返回仍是官方数据） | 实测输出 `source = skill`、取回 **469 个现货交易对**、退出码 0；没装该工具的机器上会如实打印官方安装命令并回退 |
+| **[binance-public-data](https://github.com/binance/binance-public-data)**（`data.binance.vision`） | 官方开源公开数据仓库 | `node agent.mjs --official`：逐币读官方**合约 K 线** + **合约指标文件**（含持仓量美元值），拼出带持仓量的全市场快照 | 实测 120 个币并发下载 **7.7 秒**、114 个文件解析成功、112 个进入统计 |
+| **[binance-spot-api-docs](https://github.com/binance/binance-spot-api-docs)**（`data-api.binance.vision`） | 官方公开行情接口文档 | `node agent.mjs --live`：一次请求拿全市场现货快照（`ticker/24hr` 不带 symbol） | 实测 **467 个现货交易对**、0.9 秒出结论 |
+
+**本作品自己也是一个官方规范的技能。** `skills/shichang-reqing/SKILL.md` 按官方技能格式编写
+（YAML 头部 + 触发条件 + 参数表 + 算法口径 + 诚实边界），评委可以用官方安装器一键装载：
+
+```bash
+npx skills add https://github.com/BOBO22111/shichang-reqing-agent
+```
+
+**没用到的，也逐项说明原因（不做挂名）：**
+
+| 官方资源 | 为什么没用 |
+|---|---|
+| Skills Hub 中 `binance` 组的其余 6 个技能（`academy-skill` · `fiat` · `onchain-pay` · `p2p` · `payment` · `square-post`） | 都是账户、支付、交易类能力，本作品只做**公开行情数据分析**，不需要账户权限，也不需要下单能力 |
+| Skills Hub 的 Web3 组 13 个技能（如 `crypto-market-rank` 全市场热度榜、`binance-trading-signal` 信号流） | 功能上最接近本作品，但它们的接口域名在当前网络下**连接超时**，装了也跑不起来 |
+| `binance-connector-js` / `binance-connector-python` / `binance-futures-connector-python` | 官方连接器把接口域名写死在代码里（`api.binance.com` / `fapi.binance.com`），当前网络不可达且无法改指公开入口 |
+| `binance-api-postman` | 手工调接口用的 Postman 集合，本项目用代码直接请求，用不上 |
+
+想自己验一遍，跑这三条命令就行（**都不需要任何 API 密钥**）：
+
+```bash
+node agent.mjs --skill       # 官方技能：binance-cli
+node agent.mjs --official    # 官方开源数据仓库（带持仓量）
+node agent.mjs --live        # 官方公开行情接口
+```
+
 一句话：**用官方技能包拿数据，用我们自己的引擎出结论。**
-用到哪些官方资源、哪些为什么没用，逐项写在《AGENT.md》里。
+逐项取舍的完整版（含未采用原因与本机实测数据）见《AGENT.md》第二节。
 
 ---
 

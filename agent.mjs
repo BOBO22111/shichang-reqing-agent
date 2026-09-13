@@ -8,7 +8,9 @@
  * 四条数据通道（账号与密钥要求都是零）：
  *   ① 官方技能（--skill）：直接调用币安官方技能市场（github.com/binance/binance-skills-hub）
  *      里 `binance` 技能驱动的命令行工具 binance-cli，取全市场现货快照；
- *      未安装 binance-cli 时自动回退到 --live（同一 REST 端点）并打印官方安装命令。
+ *      官方 CLI 的默认入口（主站域名）在当前网络不可达时，自动改用官方为「仅公开行情」
+ *      提供的独立入口，请求仍由官方 CLI 发起；未安装 binance-cli 时回退到 --live
+ *      并打印官方安装命令。
  *   ② 官方公开数据（--official，推荐）：读币安官方开源的公开数据仓库
  *      （github.com/binance/binance-public-data → data.binance.vision）里的
  *      合约 K 线 + 合约指标文件，逐币拼出**带持仓量的**全市场快照。
@@ -551,9 +553,18 @@ async function fetchOfficialLiveSnapshot() {
  * 九、通道三：官方技能（binance-cli）
  * ============================================================ */
 
+/**
+ * 官方技能驱动的命令行工具的可执行文件
+ * 默认从系统 PATH 里找 binance-cli；也可用环境变量 BINANCE_CLI_PATH 指定完整路径
+ */
+function binanceCliBin() {
+  const p = process.env.BINANCE_CLI_PATH;
+  return p && String(p).trim() ? String(p).trim() : 'binance-cli';
+}
+
 function binanceCliAvailable() {
   try {
-    const r = spawnSync('binance-cli', ['--version'], { encoding: 'utf8', timeout: 8000 });
+    const r = spawnSync(binanceCliBin(), ['--version'], { encoding: 'utf8', timeout: 8000 });
     return !r.error && r.status === 0;
   } catch (e) {
     return false;
@@ -563,13 +574,17 @@ function binanceCliAvailable() {
 /** 尝试官方技能的现货全市场行情命令（不同版本命令名略有差异，逐个尝试） */
 function binanceCliTickerAll() {
   const candidates = [
-    ['spot', 'ticker24hr'],
-    ['spot', 'ticker-24hr'],
-    ['spot', 'ticker', '--type', '24hr'],
+    // 官方 CLI 默认入口（官方主站域名）
+    { args: ['spot', 'ticker24hr'], via: 'main' },
+    { args: ['spot', 'ticker-24hr'], via: 'main' },
+    { args: ['spot', 'ticker', '--type', '24hr'], via: 'main' },
+    // 备用：官方为「仅需公开行情」提供的独立入口。
+    // 仍由官方 CLI 发起请求、返回官方数据，用于官方主站域名在当前网络下不可达的情况。
+    { args: ['request', 'GET', BINANCE_PUBLIC_BASE + '/ticker/24hr'], via: 'public' },
   ];
   let lastErr = null;
-  for (const args of candidates) {
-    const r = spawnSync('binance-cli', args, { encoding: 'utf8', timeout: 45000, maxBuffer: 128 * 1024 * 1024 });
+  for (const c of candidates) {
+    const r = spawnSync(binanceCliBin(), c.args, { encoding: 'utf8', timeout: 45000, maxBuffer: 128 * 1024 * 1024 });
     if (r.error) { lastErr = r.error; continue; }
     const out = String(r.stdout || '');
     const s = out.indexOf('[');
@@ -577,7 +592,9 @@ function binanceCliTickerAll() {
     if (s < 0 || e <= s) { lastErr = new Error('输出里没有 JSON 数组'); continue; }
     try {
       const rows = JSON.parse(out.slice(s, e + 1));
-      if (Array.isArray(rows) && rows.length) return { rows: rows, cmd: 'binance-cli ' + args.join(' ') };
+      if (Array.isArray(rows) && rows.length) {
+        return { rows: rows, cmd: 'binance-cli ' + c.args.join(' '), via: c.via };
+      }
     } catch (err) {
       lastErr = err;
     }
@@ -680,7 +697,7 @@ if (opts.help) {
   --symbols A,B,C   官方通道只分析这些币种（优先于动态取名单）
   --date YYYY-MM-DD 官方通道的 UTC 日期，默认自动取最近一个已发布文件的日期
   --live            官方公开行情接口（全市场现货快照，一次拿全）
-  --skill           官方技能通道（binance-cli；未安装则回退到 --live）
+  --skill           官方技能通道（binance-cli；未安装或主站不可达时自动换用官方公开入口）
   --concurrency N   官方通道的并发下载数，默认 10
   --spot / --perp   现货 / 永续合约（默认永续）
   --json            输出 JSON（进度信息写到 stderr，stdout 只有 JSON）
@@ -870,6 +887,9 @@ if (opts.source === 'official') {
       rows = r.rows;
       cmd = r.cmd;
       say('命令：' + r.cmd);
+      if (r.via === 'public') {
+        say('说明：官方 CLI 的默认入口在本机网络下不可达，已改用官方为「仅公开行情」提供的独立入口（请求仍由官方 CLI 发起）。');
+      }
     } catch (e) {
       say('binance-cli 调用失败（' + (e.message || e) + '），回退到官方公开行情接口。');
       opts.source = 'live';
@@ -878,7 +898,8 @@ if (opts.source === 'official') {
     }
   }
 
-  if (opts.source === 'live') {
+  /* 官方技能通道成功取到数据时（opts.source 仍为 skill），也要走同一套归一化 */
+  if (opts.source === 'live' || (rows && rows.length)) {
     if (!rows) {
       say('通道：币安官方公开行情接口（data-api.binance.vision · 现货 · 无需密钥）');
       say('说明：该入口是币安为「仅需公开行情」场景提供的公开地址，不涉及账户信息；仅提供现货市场。');
@@ -930,7 +951,9 @@ if (opts.source === 'official') {
       sourceInfo = {
         kind: 'skill',
         label: '官方技能 binance-cli（Skills Hub · ' + cmd + '）',
-        url: cmd,
+        url: cmd.startsWith('binance-cli request')
+          ? BINANCE_PUBLIC_BASE + '/ticker/24hr'
+          : 'https://api.binance.com/api/v3/ticker/24hr',
       };
     }
   }
